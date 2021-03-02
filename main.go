@@ -8,17 +8,22 @@ import(
 	"io/ioutil"
 	"time"
 	"math/rand"
-	"benchmark/internal/distuv"
+	// "benchmark/internal/distuv"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/plotutil"
 	"gonum.org/v1/plot/vg"
 	"sort"
-	// "gonum.org/v1/gonum/stat/distuv"
+	// "image/color"
+
+
+	"gonum.org/v1/gonum/stat/distuv"
 )
 
 const (
 	TestTime = 5
+	RequestTimePoissonLambda = 30
+	NumberOfRequests = 40
 )
 
 type Function struct {
@@ -36,23 +41,34 @@ func main() {
    
     // executionTime := sendPostRequest(functions[0], "google.com")
 	functions = initialize()
+	maxTime := largest(functions[0].requestTime)
+	for i := range functions {
+		temp := largest(functions[i].requestTime)
+		if temp > maxTime {
+			maxTime = temp
+		}
+	}
 	
-	coutner := 0
+	counter := 0
 	for {
 		for i, f := range functions {
-             go sendPostRequest(i, f.url, f.inputs[coutner%len(f.inputs)])
+			for j := range f.requestTime {
+				if j == counter {
+					go sendPostRequest(i, f.url, f.inputs[rand.Intn(len(f.inputs) - 0) + 0])
+				}
+			}
 		}
-		time.Sleep(500*time.Millisecond)
-		coutner++
-		if coutner > 18 {
+		time.Sleep(100*time.Millisecond)
+		counter++
+		if counter > maxTime {
 			break
 		}
 	}
-	time.Sleep(5000*time.Millisecond)
+	time.Sleep(15000*time.Millisecond)
 	for _, f := range functions {
 		fmt.Println("Execution time:", f.executionsTime)
     }
-	plotInfo()
+	plotBox();
 	// fmt.Println("executionTime:", executionTime.Milliseconds())
 
 }
@@ -74,10 +90,10 @@ func sendPostRequest(index int, url string, data string) time.Duration  {
 	duration := time.Since(t1)
     defer resp.Body.Close()
 
-    fmt.Println("response Status:", resp.Status)
+    // fmt.Println("response Status:", resp.Status)
     // fmt.Println("response Headers:", resp.Header)
-    body, _ := ioutil.ReadAll(resp.Body)
-    fmt.Println("response Body:", len(body), ", execution time:", duration.Milliseconds())
+    _, _ = ioutil.ReadAll(resp.Body)
+    // fmt.Println("response Body:", len(body), ", execution time:", duration.Milliseconds())
 	functions[index].executionsTime = append(functions[index].executionsTime, duration.Milliseconds())
 	return duration
 }
@@ -93,7 +109,7 @@ func initialize() []Function {
 	for {
 		images = append(images, "http://mvatandoosts.ir/assets/images/I"+strconv.Itoa(counter)+".jpg" )
 		counter++
-		if counter > 10 {
+		if counter > 30 {
 			break
 		}
 	}
@@ -111,34 +127,52 @@ func initialize() []Function {
 	websites = append(websites, "divar.ir")
 	websites = append(websites, "mvatandoosts.ir")
 
-    // requestTime = append(requestTime, 1)
-	// requestTime = append(requestTime, 2)
-	// requestTime = append(requestTime, 3)
-	// requestTime = append(requestTime, 4)
-	// requestTime = append(requestTime, 5)
-	// requestTime = append(requestTime, 6)
-	// requestTime = append(requestTime, 7)
-	// requestTime = append(requestTime, 8)
-	// requestTime = append(requestTime, 9)
-	// requestTime = append(requestTime, 10)
+	websites = append(websites, "lvp.ir")
+	websites = append(websites, "honar.ac.ir")
+	websites = append(websites, "cila.ir")
+	websites = append(websites, "ncc.org.ir")
+	websites = append(websites, "zakhireh.co.ir")
+	websites = append(websites, "aeoi.org.ir")
+	websites = append(websites, "ilamchto.ir")
+	websites = append(websites, "zanjan.ichto.ir")
+	websites = append(websites, "chht-sb.ir")
+	websites = append(websites, "miras.kr.ir")
+	websites = append(websites, "hadafmandi.ir")
+	websites = append(websites, "ilam.ict.gov.ir")
 
-	requestTime = makeRequestTime(10)
+	websites = append(websites, "postbank.ir")
+	websites = append(websites, "isrc.ac.ir")
+	websites = append(websites, "ilam.medu.ir")
+	websites = append(websites, "khn.medu.ir")
+	websites = append(websites, "qom.medu.ir")
+	websites = append(websites, "lorestan.medu.ir")
+	websites = append(websites, "srttu.edu")
+	websites = append(websites, "mosharekat.medu.ir")
+	websites = append(websites, "irica.gov.ir")
+	websites = append(websites, "mfa.gov.ir")
+	websites = append(websites, "hbi.ir")
+	websites = append(websites, "roostaa.ir")
+
+
+
+	requestTime = makeRequestTime(RequestTimePoissonLambda)
 	sort.Ints(requestTime)
+	fmt.Println("Number of Requests: ", len(requestTime))
 	fmt.Println("requestTime: ", requestTime)
 	functions = append(functions, Function{url: "http://localhost:8080/function/nslookup", ips: 5, index: 0, inputs: websites, requestTime: requestTime} )
-	requestTime = makeRequestTime(10)
+	requestTime = makeRequestTime(RequestTimePoissonLambda)
 	sort.Ints(requestTime)
 	fmt.Println("requestTime: ", requestTime)
 	functions = append(functions, Function{url: "http://localhost:8080/function/face-detect-pigo", ips: 5, index: 0, inputs: images, requestTime: requestTime} )
-	requestTime = makeRequestTime(10)
+	requestTime = makeRequestTime(RequestTimePoissonLambda)
 	sort.Ints(requestTime)
 	fmt.Println("requestTime: ", requestTime)
 	functions = append(functions, Function{url: "http://localhost:8080/function/qrcode-go", ips: 5, index: 0, inputs: websites, requestTime: requestTime} )
-	requestTime = makeRequestTime(10)
+	requestTime = makeRequestTime(RequestTimePoissonLambda)
 	sort.Ints(requestTime)
 	fmt.Println("requestTime: ", requestTime)
 	functions = append(functions, Function{url: "http://localhost:8080/function/face-blur", ips: 5, index: 0, inputs: images, requestTime: requestTime} )
-	requestTime = makeRequestTime(10)
+	requestTime = makeRequestTime(RequestTimePoissonLambda)
 	sort.Ints(requestTime)
 	fmt.Println("requestTime: ", requestTime)
 	functions = append(functions, Function{url: "http://localhost:8080/function/business-strategy-generator", ips: 5, index: 0, inputs: websites, requestTime: requestTime} )
@@ -155,7 +189,7 @@ func makeRequestTime(lambda float64) []int  {
 	for {
 		requestTime = append(requestTime, int(distribution.Rand()))
 		counter++
-		if counter > 24 {
+		if counter > NumberOfRequests {
 			break
 		}
 	} 
@@ -205,4 +239,89 @@ func randomPoints(n int) plotter.XYs {
 	}
 	return pts
 }
+
+func plotBox()  {
+	// Get some data to display in our plot.
+	rand.Seed(int64(0))
+	n := len(functions[0].executionsTime)
+	var results []plotter.Values
+	for i := 0; i < len(functions); i++ {
+		results = append(results, make(plotter.Values, n))
+	}
+	// f1 := make(plotter.Values, n)
+	// f2 := make(plotter.Values, n)
+	// f3 := make(plotter.Values, n)
+	// f4 := make(plotter.Values, n)
+	// f5 := make(plotter.Values, n)
+	// fmt.Println(len(functions[0].requestTime))
+	// fmt.Println(len(functions[1].requestTime))
+	// fmt.Println(len(functions[2].requestTime))
+	// fmt.Println(n)
+	for i := 0; i < n; i++ {
+		for j := 0; j < len(functions); j++ {
+			results[j][i] = float64(functions[j].executionsTime[i])
+		}
+	}
+	// fmt.Println(f1[n-1])
+	// fmt.Println(f2[n-1])
+	// fmt.Println(f3[n-1])
+
+	
+
+	// Create the plot and set its title and axis label.
+	p, _ := plot.New()
+
+	p.Title.Text = "Execution time (ms)"
+	p.Y.Label.Text = "time (ms)"
+    
+	// Make boxes for our data and add them to the plot.
+	w := vg.Points(20)
+	// var boxes []*plotter.BoxPlot
+	boxes := make([]*plotter.BoxPlot, len(functions))
+	// var err Error
+	for i := 0; i < len(functions); i++ {
+		boxes[i], _ = plotter.NewBoxPlot(w, float64(i), results[i])
+		// boxes = append(boxes, b0)
+	    // if err != nil {
+		//    panic(err)
+	    // }
+		p.Add(boxes[i])
+	}
+	// b0, err := plotter.NewBoxPlot(w, 0, f1)
+    //     // b0.FillColor = color.RGBA{127, 188, 165, 1}
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// b1, err := plotter.NewBoxPlot(w, 1, f2)
+    //     // b1.FillColor = color.RGBA{127, 188, 165, 1}
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// b2, err := plotter.NewBoxPlot(w, 2, f3)
+    //     // b2.FillColor = color.RGBA{127, 188, 165, 1}
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// p.Add(b0, b1, b2)
+
+	// Set the X axis of the plot to nominal with
+	// the given names for x=0, x=1 and x=2.
+	p.NominalX("nslookup", "face-detect\npigo",
+		"qrcode-go", "face-blur", "business-strategy\ngenerator")
+
+	if err := p.Save(10*vg.Inch, 8*vg.Inch, "boxplot.png"); err != nil {
+		panic(err)
+	}
+}
+
+func largest(arr []int) int {
+	var max = arr[0]
+	for i := range arr {
+	   if arr[i] > max {
+		  max = arr[i]
+	   }
+	}
+	return max
+ }
+ 
     
