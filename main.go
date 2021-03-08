@@ -15,15 +15,17 @@ import(
 	"gonum.org/v1/plot/vg"
 	"sort"
 	// "image/color"
-
+	"bufio"
+	"os"
 
 	"gonum.org/v1/gonum/stat/distuv"
 )
 
 const (
 	// TestTime = 5
-	RequestTimePoissonLambda = 30
-	NumberOfRequests = 30
+	RequestTimePoissonLambda = 100
+	NumberOfRequests = 100
+	NumberOfTests = 5
 )
 
 type Function struct {
@@ -39,57 +41,70 @@ var functions []Function
 
 func main() {
    
-    // executionTime := sendPostRequest(functions[0], "google.com")
 	functions = initialize()
-	maxTime := largest(functions[0].requestTime)
-	for i := range functions {
-		temp := largest(functions[i].requestTime)
-		if temp > maxTime {
-			maxTime = temp
-		}
-	}
-	
-	counter := 0
+	testCounter := 0
 	for {
-		for i, f := range functions {
-			for j := range f.requestTime {
-				if j == counter {
-					if i== 4 {
-						go sendPostRequest(i, f.url, f.inputs[rand.Intn(len(f.inputs) - 0) + 0]+strconv.Itoa(j))
-					} else {
-						go sendPostRequest(i, f.url, f.inputs[rand.Intn(len(f.inputs) - 0) + 0])
-					}
-					
-				}
+		fmt.Println("============ Test Number ",testCounter, "===========")
+		maxTime := largest(functions[0].requestTime)
+		for i := range functions {
+			temp := largest(functions[i].requestTime)
+			if temp > maxTime {
+				maxTime = temp
 			}
 		}
-		time.Sleep(100*time.Millisecond)
-		counter++
-		if counter > maxTime {
+		
+		counter := 0
+		for {
+			for i, f := range functions {
+				for j := range f.requestTime {
+					if j == counter {
+						if i== 4 {
+							go sendPostRequest(i, f.url, f.inputs[rand.Intn(len(f.inputs) - 0) + 0]+strconv.Itoa(j))
+						} else {
+							go sendPostRequest(i, f.url, f.inputs[rand.Intn(len(f.inputs) - 0) + 0])
+						}
+						
+					}
+				}
+			}
+			time.Sleep(100*time.Millisecond)
+			counter++
+			if counter > maxTime {
+				break
+			}
+		}
+		time.Sleep(15000*time.Millisecond)
+		for i, f := range functions {
+			fmt.Println("============  ",i, "===========")
+			fmt.Println("Execution time:", f.executionsTime)
+		}
+		plotBox("ExecutionTime_Test"+strconv.Itoa(testCounter)+".png" );
+		reportTestResult();
+		testCounter++
+		if testCounter == NumberOfTests {
 			break
 		}
+		fmt.Print("Press 'Enter' to continue...")
+        bufio.NewReader(os.Stdin).ReadBytes('\n') 
+		makeRequestTimes() 
+		clearExecutionTime()
 	}
-	time.Sleep(15000*time.Millisecond)
-	for i, f := range functions {
-		fmt.Println("============  ",i, "===========")
-		fmt.Println("Execution time:", f.executionsTime)
-    }
-	plotBox();
-	reportResult();
+	
 	// fmt.Println("executionTime:", executionTime.Milliseconds())
 
 }
 
-func reportResult()  {
+
+
+func reportTestResult()  {
 	var worstCase []int
 	var average []int
 	for j := 0; j < len(functions); j++ {
 		worstCase = append(worstCase,largestInt64(functions[j].executionsTime))
 		average = append(average,averageInt64(functions[j].executionsTime))
-		fmt.Println("============  ",j, "===========")
-		fmt.Println("Worst Case Execution time:", worstCase)
-		fmt.Println("Average Execution time:", average)
 	}
+	fmt.Println("Worst Case Execution time:", worstCase)
+	fmt.Println("Average Execution time:", average)
 }
 
 func sendPostRequest(index int, url string, data string) time.Duration  {
@@ -178,27 +193,41 @@ func initialize() []Function {
 	requestTime = makeRequestTime(RequestTimePoissonLambda)
 	sort.Ints(requestTime)
 	fmt.Println("Number of Requests: ", len(requestTime))
+	fmt.Println("============ 0 ============ ")
 	fmt.Println("requestTime: ", requestTime)
 	functions = append(functions, Function{url: "http://localhost:8080/function/nslookup", ips: 5, index: 0, inputs: websites, requestTime: requestTime} )
 	requestTime = makeRequestTime(RequestTimePoissonLambda)
 	sort.Ints(requestTime)
+	fmt.Println("============ 1 ============ ")
 	fmt.Println("requestTime: ", requestTime)
 	functions = append(functions, Function{url: "http://localhost:8080/function/face-detect-pigo", ips: 5, index: 0, inputs: images, requestTime: requestTime} )
 	requestTime = makeRequestTime(RequestTimePoissonLambda)
 	sort.Ints(requestTime)
+	fmt.Println("============ 2 ============ ")
 	fmt.Println("requestTime: ", requestTime)
 	functions = append(functions, Function{url: "http://localhost:8080/function/qrcode-go", ips: 5, index: 0, inputs: websites, requestTime: requestTime} )
 	requestTime = makeRequestTime(RequestTimePoissonLambda)
 	sort.Ints(requestTime)
+	fmt.Println("============ 3 ============ ")
 	fmt.Println("requestTime: ", requestTime)
 	functions = append(functions, Function{url: "http://localhost:8080/function/face-blur", ips: 5, index: 0, inputs: images, requestTime: requestTime} )
 	requestTime = makeRequestTime(RequestTimePoissonLambda)
 	sort.Ints(requestTime)
+	fmt.Println("============ 4 ============ ")
 	fmt.Println("requestTime: ", requestTime)
 	functions = append(functions, Function{url: "http://localhost:8080/function/business-strategy-generator", ips: 5, index: 0, inputs: websites, requestTime: requestTime} )
 
     
 	return functions
+}
+
+func makeRequestTimes()  {
+	for j := 0; j < len(functions); j++ {
+		requestTime := makeRequestTime(RequestTimePoissonLambda)
+		functions[j].requestTime = requestTime
+		fmt.Println("============  ",j, "===========")
+		fmt.Println("requestTime: ", requestTime)
+	}
 }
 
 
@@ -245,6 +274,7 @@ func plotInfo()  {
 	}
 }
 
+
 // randomPoints returns some random x, y points.
 func randomPoints(n int) plotter.XYs {
 	pts := make(plotter.XYs, n)
@@ -259,7 +289,7 @@ func randomPoints(n int) plotter.XYs {
 	return pts
 }
 
-func plotBox()  {
+func plotBox(imageName string)  {
 	// Get some data to display in our plot.
 	rand.Seed(int64(0))
 	n := len(functions[0].executionsTime)
@@ -301,7 +331,7 @@ func plotBox()  {
 	p.NominalX("nslookup", "face-detect\npigo",
 		"qrcode-go", "face-blur", "business-strategy\ngenerator")
 
-	if err := p.Save(10*vg.Inch, 8*vg.Inch, "boxplot.png"); err != nil {
+	if err := p.Save(10*vg.Inch, 8*vg.Inch, imageName); err != nil {
 		panic(err)
 	}
 }
@@ -334,5 +364,10 @@ func largest(arr []int) int {
 	return int(sum/len(arr))
  }
  
+ func clearExecutionTime()  {
+	for i := 0; i < len(functions); i++ {
+		functions[i].executionsTime = functions[i].executionsTime[:0]
+	}
+ }
  
     
