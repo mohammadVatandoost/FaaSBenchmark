@@ -21,9 +21,9 @@ import(
 )
 
 const (
-	TestTime = 5
+	// TestTime = 5
 	RequestTimePoissonLambda = 30
-	NumberOfRequests = 40
+	NumberOfRequests = 30
 )
 
 type Function struct {
@@ -54,7 +54,12 @@ func main() {
 		for i, f := range functions {
 			for j := range f.requestTime {
 				if j == counter {
-					go sendPostRequest(i, f.url, f.inputs[rand.Intn(len(f.inputs) - 0) + 0])
+					if i== 4 {
+						go sendPostRequest(i, f.url, f.inputs[rand.Intn(len(f.inputs) - 0) + 0]+strconv.Itoa(j))
+					} else {
+						go sendPostRequest(i, f.url, f.inputs[rand.Intn(len(f.inputs) - 0) + 0])
+					}
+					
 				}
 			}
 		}
@@ -65,12 +70,26 @@ func main() {
 		}
 	}
 	time.Sleep(15000*time.Millisecond)
-	for _, f := range functions {
+	for i, f := range functions {
+		fmt.Println("============  ",i, "===========")
 		fmt.Println("Execution time:", f.executionsTime)
     }
 	plotBox();
+	reportResult();
 	// fmt.Println("executionTime:", executionTime.Milliseconds())
 
+}
+
+func reportResult()  {
+	var worstCase []int
+	var average []int
+	for j := 0; j < len(functions); j++ {
+		worstCase = append(worstCase,largestInt64(functions[j].executionsTime))
+		average = append(average,averageInt64(functions[j].executionsTime))
+		fmt.Println("============  ",j, "===========")
+		fmt.Println("Worst Case Execution time:", worstCase)
+		fmt.Println("Average Execution time:", average)
+	}
 }
 
 func sendPostRequest(index int, url string, data string) time.Duration  {
@@ -99,6 +118,7 @@ func sendPostRequest(index int, url string, data string) time.Duration  {
 }
 
 func initialize() []Function {
+	
 	var images []string
 	var websites []string
 	var functions []Function
@@ -220,7 +240,6 @@ func plotInfo()  {
 		panic(err)
 	}
 
-	// Save the plot to a PNG file.
 	if err := p.Save(18*vg.Inch, 10*vg.Inch, "points.png"); err != nil {
 		panic(err)
 	}
@@ -248,23 +267,13 @@ func plotBox()  {
 	for i := 0; i < len(functions); i++ {
 		results = append(results, make(plotter.Values, n))
 	}
-	// f1 := make(plotter.Values, n)
-	// f2 := make(plotter.Values, n)
-	// f3 := make(plotter.Values, n)
-	// f4 := make(plotter.Values, n)
-	// f5 := make(plotter.Values, n)
-	// fmt.Println(len(functions[0].requestTime))
-	// fmt.Println(len(functions[1].requestTime))
-	// fmt.Println(len(functions[2].requestTime))
-	// fmt.Println(n)
+	
 	for i := 0; i < n; i++ {
 		for j := 0; j < len(functions); j++ {
 			results[j][i] = float64(functions[j].executionsTime[i])
 		}
 	}
-	// fmt.Println(f1[n-1])
-	// fmt.Println(f2[n-1])
-	// fmt.Println(f3[n-1])
+	
 
 	
 
@@ -287,25 +296,8 @@ func plotBox()  {
 	    // }
 		p.Add(boxes[i])
 	}
-	// b0, err := plotter.NewBoxPlot(w, 0, f1)
-    //     // b0.FillColor = color.RGBA{127, 188, 165, 1}
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// b1, err := plotter.NewBoxPlot(w, 1, f2)
-    //     // b1.FillColor = color.RGBA{127, 188, 165, 1}
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// b2, err := plotter.NewBoxPlot(w, 2, f3)
-    //     // b2.FillColor = color.RGBA{127, 188, 165, 1}
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// p.Add(b0, b1, b2)
 
-	// Set the X axis of the plot to nominal with
-	// the given names for x=0, x=1 and x=2.
+
 	p.NominalX("nslookup", "face-detect\npigo",
 		"qrcode-go", "face-blur", "business-strategy\ngenerator")
 
@@ -323,5 +315,24 @@ func largest(arr []int) int {
 	}
 	return max
  }
+
+ func largestInt64(arr []int64) int {
+	var max = arr[0]
+	for i := range arr {
+	   if arr[i] > max {
+		  max = arr[i]
+	   }
+	}
+	return int(max)
+ }
+ 
+ func averageInt64(arr []int64) int {
+	sum := 0 
+	for i := range arr {
+	   sum = sum + int(arr[i])
+	}
+	return int(sum/len(arr))
+ }
+ 
  
     
