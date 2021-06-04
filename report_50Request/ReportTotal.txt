@@ -1,0 +1,9 @@
+-- no cache
+Worst Cases Execution time: [9475 20004 455 20003 436]
+Averages Execution time: [2279 2397 74 2302 58]
+-- Just Agent Cache, Size = 4,   4 Agent
+Worst Cases Execution time: [13543 20176 3675 23181 3561]
+Averages Execution time: [2794 3647 493 3818 464]
+-- Just Agent Cache, Size = 8,   4 Agent
+Worst Cases Execution time: [7380 20066 469 20317 481]
+Averages Execution time: [2190 2826 93 3278 83]

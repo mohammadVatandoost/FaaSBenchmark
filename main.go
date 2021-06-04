@@ -1,19 +1,22 @@
 package main
 
-import(
-	"fmt"
-	"strconv"
-	"net/http"
+import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
-	"time"
 	"math/rand"
+	"net/http"
+	"strconv"
+	"time"
+
 	// "benchmark/internal/distuv"
+	"sort"
+
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/plotutil"
 	"gonum.org/v1/plot/vg"
-	"sort"
+
 	// "image/color"
 	"bufio"
 	"os"
@@ -23,28 +26,31 @@ import(
 
 const (
 	// TestTime = 5
-	RequestTimePoissonLambda = 100
-	NumberOfRequests = 100
-	NumberOfTests = 5
+	RequestTimePoissonLambda = 50
+	NumberOfRequests         = 50
+	NumberOfTests            = 5
 )
 
 type Function struct {
-	url string
-	ips int  // invocations per second (ips) 
+	url            string
+	ips            int // invocations per second (ips)
 	executionsTime []int64
-    requestTime []int
-	index int
-	inputs []string
+	requestTime    []int
+	worstCases     []int
+	averages       []int
+	index          int
+	inputs         []string
 }
 
 var functions []Function
 
 func main() {
-   
+
 	functions = initialize()
 	testCounter := 0
+
 	for {
-		fmt.Println("============ Test Number ",testCounter, "===========")
+		fmt.Println("*****************Test Number ", testCounter, "*****************")
 		maxTime := largest(functions[0].requestTime)
 		for i := range functions {
 			temp := largest(functions[i].requestTime)
@@ -52,99 +58,117 @@ func main() {
 				maxTime = temp
 			}
 		}
-		
+
 		counter := 0
 		for {
 			for i, f := range functions {
 				for j := range f.requestTime {
 					if j == counter {
-						if i== 4 {
-							go sendPostRequest(i, f.url, f.inputs[rand.Intn(len(f.inputs) - 0) + 0]+strconv.Itoa(j))
+						if i == 4 {
+							go sendPostRequest(i, f.url, f.inputs[rand.Intn(len(f.inputs)-0)+0]+strconv.Itoa(j))
 						} else {
-							go sendPostRequest(i, f.url, f.inputs[rand.Intn(len(f.inputs) - 0) + 0])
+							go sendPostRequest(i, f.url, f.inputs[rand.Intn(len(f.inputs)-0)+0])
 						}
-						
+
 					}
 				}
 			}
-			time.Sleep(100*time.Millisecond)
+			time.Sleep(200 * time.Millisecond)
 			counter++
 			if counter > maxTime {
 				break
 			}
 		}
-		time.Sleep(15000*time.Millisecond)
+		time.Sleep(20000 * time.Millisecond)
 		for i, f := range functions {
-			fmt.Println("============  ",i, "===========")
+			fmt.Println("============  ", i, "===========")
 			fmt.Println("Execution time:", f.executionsTime)
 		}
-		plotBox("ExecutionTime_Test"+strconv.Itoa(testCounter)+".png" );
-		reportTestResult();
+		plotBox("ExecutionTime_Test" + strconv.Itoa(testCounter) + ".png")
+		reportTestResult()
 		testCounter++
 		if testCounter == NumberOfTests {
 			break
 		}
 		fmt.Print("Press 'Enter' to continue...")
-        bufio.NewReader(os.Stdin).ReadBytes('\n') 
-		makeRequestTimes() 
+		bufio.NewReader(os.Stdin).ReadBytes('\n')
+		makeRequestTimes()
 		clearExecutionTime()
 	}
-	
-	// fmt.Println("executionTime:", executionTime.Milliseconds())
 
+	// fmt.Println("executionTime:", executionTime.Milliseconds())
+	reportTotal()
 }
 
-
-
-func reportTestResult()  {
+func reportTotal() {
 	var worstCase []int
 	var average []int
 	for j := 0; j < len(functions); j++ {
-		worstCase = append(worstCase,largestInt64(functions[j].executionsTime))
-		average = append(average,averageInt64(functions[j].executionsTime))
+		temp := largest(functions[j].worstCases)
+		worstCase = append(worstCase, temp)
+		temp = averageInt(functions[j].averages)
+		average = append(average, temp)
+	}
+	fmt.Println("========== Total  ============")
+	fmt.Println("Worst Cases Execution time:", worstCase)
+	fmt.Println("Averages Execution time:", average)
+}
+
+func reportTestResult() {
+	var worstCase []int
+	var average []int
+	for j := 0; j < len(functions); j++ {
+		temp := largestInt64(functions[j].executionsTime)
+		worstCase = append(worstCase, temp)
+		functions[j].worstCases = append(functions[j].worstCases, temp)
+		temp = averageInt64(functions[j].executionsTime)
+		average = append(average, temp)
+		functions[j].averages = append(functions[j].averages, temp)
 	}
 	fmt.Println("Worst Case Execution time:", worstCase)
 	fmt.Println("Average Execution time:", average)
 }
 
-func sendPostRequest(index int, url string, data string) time.Duration  {
-    fmt.Println("sendPostRequest URL:>", url)
+func sendPostRequest(index int, url string, data string) time.Duration {
+	// fmt.Println("sendPostRequest URL:>", url)
 
-    var jsonStr = []byte(data)
-    req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
-    req.Header.Set("X-Custom-Header", "myvalue")
-    req.Header.Set("Content-Type", "application/json")
+	var jsonStr = []byte(data)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+	req.Header.Set("X-Custom-Header", "myvalue")
+	req.Header.Set("Content-Type", "application/json")
 
-    client := &http.Client{}
+	client := &http.Client{}
 	t1 := time.Now()
-    resp, err := client.Do(req)
-    if err != nil {
-        panic(err)
-    }
+	resp, err := client.Do(req)
+	if err != nil {
+		panic(err)
+	}
 	duration := time.Since(t1)
-    defer resp.Body.Close()
+	defer resp.Body.Close()
 
-    // fmt.Println("response Status:", resp.Status)
-    // fmt.Println("response Headers:", resp.Header)
-    _, _ = ioutil.ReadAll(resp.Body)
-    // fmt.Println("response Body:", len(body), ", execution time:", duration.Milliseconds())
+	// fmt.Println("response Status:", resp.Status)
+	// fmt.Println("response Headers:", resp.Header)
+	_, _ = ioutil.ReadAll(resp.Body)
+	// fmt.Println("response Body:", len(body), ", execution time:", duration.Milliseconds())
 	functions[index].executionsTime = append(functions[index].executionsTime, duration.Milliseconds())
 	return duration
 }
 
 func initialize() []Function {
-	
+
 	var images []string
 	var websites []string
 	var functions []Function
-    var requestTime []int
-	
+	var requestTime []int
 
 	counter := 1
 	for {
-		images = append(images, "http://mvatandoosts.ir/assets/images/I"+strconv.Itoa(counter)+".jpg" )
+		images = append(images, "http://mvatandoosts.ir/assets/images/I"+strconv.Itoa(counter)+".jpg")
 		counter++
-		if counter > 30 {
+		// if counter > 30 {
+		// 	break
+		// }
+		if counter > 10 {
 			break
 		}
 	}
@@ -162,76 +186,76 @@ func initialize() []Function {
 	websites = append(websites, "divar.ir")
 	websites = append(websites, "mvatandoosts.ir")
 
-	websites = append(websites, "lvp.ir")
-	websites = append(websites, "honar.ac.ir")
-	websites = append(websites, "cila.ir")
-	websites = append(websites, "ncc.org.ir")
-	websites = append(websites, "zakhireh.co.ir")
-	websites = append(websites, "aeoi.org.ir")
-	websites = append(websites, "ilamchto.ir")
-	websites = append(websites, "zanjan.ichto.ir")
-	websites = append(websites, "chht-sb.ir")
-	websites = append(websites, "miras.kr.ir")
-	websites = append(websites, "hadafmandi.ir")
-	websites = append(websites, "ilam.ict.gov.ir")
+	// websites = append(websites, "lvp.ir")
+	// websites = append(websites, "honar.ac.ir")
+	// websites = append(websites, "cila.ir")
+	// websites = append(websites, "ncc.org.ir")
+	// websites = append(websites, "zakhireh.co.ir")
+	// websites = append(websites, "aeoi.org.ir")
+	// websites = append(websites, "ilamchto.ir")
+	// websites = append(websites, "zanjan.ichto.ir")
+	// websites = append(websites, "chht-sb.ir")
+	// websites = append(websites, "miras.kr.ir")
+	// websites = append(websites, "hadafmandi.ir")
+	// websites = append(websites, "ilam.ict.gov.ir")
 
-	websites = append(websites, "postbank.ir")
-	websites = append(websites, "isrc.ac.ir")
-	websites = append(websites, "ilam.medu.ir")
-	websites = append(websites, "khn.medu.ir")
-	websites = append(websites, "qom.medu.ir")
-	websites = append(websites, "lorestan.medu.ir")
-	websites = append(websites, "srttu.edu")
-	websites = append(websites, "mosharekat.medu.ir")
-	websites = append(websites, "irica.gov.ir")
-	websites = append(websites, "mfa.gov.ir")
-	websites = append(websites, "hbi.ir")
-	websites = append(websites, "roostaa.ir")
+	// websites = append(websites, "postbank.ir")
+	// websites = append(websites, "isrc.ac.ir")
+	// websites = append(websites, "ilam.medu.ir")
+	// websites = append(websites, "khn.medu.ir")
+	// websites = append(websites, "qom.medu.ir")
+	// websites = append(websites, "lorestan.medu.ir")
+	// websites = append(websites, "srttu.edu")
+	// websites = append(websites, "mosharekat.medu.ir")
+	// websites = append(websites, "irica.gov.ir")
+	// websites = append(websites, "mfa.gov.ir")
+	// websites = append(websites, "hbi.ir")
+	// websites = append(websites, "roostaa.ir")
 
-
-
+	// requestsTime := makeRequestsTime(RequestTimePoissonLambda)
+	// fmt.Println("requestsTime: ", requestsTime)
 	requestTime = makeRequestTime(RequestTimePoissonLambda)
 	sort.Ints(requestTime)
 	fmt.Println("Number of Requests: ", len(requestTime))
 	fmt.Println("============ 0 ============ ")
 	fmt.Println("requestTime: ", requestTime)
-	functions = append(functions, Function{url: "http://localhost:8080/function/nslookup", ips: 5, index: 0, inputs: websites, requestTime: requestTime} )
+	// functions = append(functions, Function{url: "http://localhost:8080/function/nslookup", ips: 5, index: 0, inputs: websites, requestTime: requestTime})
+	// requestTime = makeRequestTime(RequestTimePoissonLambda)
+	functions = append(functions, Function{url: "http://localhost:8080/function/shasum", ips: 5, index: 0, inputs: websites, requestTime: requestTime})
 	requestTime = makeRequestTime(RequestTimePoissonLambda)
 	sort.Ints(requestTime)
 	fmt.Println("============ 1 ============ ")
 	fmt.Println("requestTime: ", requestTime)
-	functions = append(functions, Function{url: "http://localhost:8080/function/face-detect-pigo", ips: 5, index: 0, inputs: images, requestTime: requestTime} )
+	functions = append(functions, Function{url: "http://localhost:8080/function/face-detect-pigo", ips: 5, index: 0, inputs: images, requestTime: requestTime})
 	requestTime = makeRequestTime(RequestTimePoissonLambda)
 	sort.Ints(requestTime)
 	fmt.Println("============ 2 ============ ")
 	fmt.Println("requestTime: ", requestTime)
-	functions = append(functions, Function{url: "http://localhost:8080/function/qrcode-go", ips: 5, index: 0, inputs: websites, requestTime: requestTime} )
+	functions = append(functions, Function{url: "http://localhost:8080/function/qrcode-go", ips: 5, index: 0, inputs: websites, requestTime: requestTime})
 	requestTime = makeRequestTime(RequestTimePoissonLambda)
 	sort.Ints(requestTime)
 	fmt.Println("============ 3 ============ ")
 	fmt.Println("requestTime: ", requestTime)
-	functions = append(functions, Function{url: "http://localhost:8080/function/face-blur", ips: 5, index: 0, inputs: images, requestTime: requestTime} )
+	functions = append(functions, Function{url: "http://localhost:8080/function/face-blur", ips: 5, index: 0, inputs: images, requestTime: requestTime})
 	requestTime = makeRequestTime(RequestTimePoissonLambda)
 	sort.Ints(requestTime)
 	fmt.Println("============ 4 ============ ")
 	fmt.Println("requestTime: ", requestTime)
-	functions = append(functions, Function{url: "http://localhost:8080/function/business-strategy-generator", ips: 5, index: 0, inputs: websites, requestTime: requestTime} )
+	functions = append(functions, Function{url: "http://localhost:8080/function/business-strategy-generator", ips: 5, index: 0, inputs: websites, requestTime: requestTime})
 
-    
 	return functions
 }
 
-func makeRequestTimes()  {
+func makeRequestTimes() {
 	for j := 0; j < len(functions); j++ {
 		requestTime := makeRequestTime(RequestTimePoissonLambda)
 		functions[j].requestTime = requestTime
-		fmt.Println("============  ",j, "===========")
+		fmt.Println("============  ", j, "===========")
 		fmt.Println("requestTime: ", requestTime)
 	}
 }
 
-
-func makeRequestTime(lambda float64) []int  {
+func makeRequestTime(lambda float64) []int {
 	var requestTime []int
 	distribution := distuv.Poisson{Lambda: lambda}
 	counter := 1
@@ -241,13 +265,11 @@ func makeRequestTime(lambda float64) []int  {
 		if counter > NumberOfRequests {
 			break
 		}
-	} 
+	}
 	return requestTime
 }
 
-
-
-func plotInfo()  {
+func plotInfo() {
 	rand.Seed(int64(0))
 
 	p, err := plot.New()
@@ -274,6 +296,19 @@ func plotInfo()  {
 	}
 }
 
+func makeRequestsTime(lambda float64) []float64 {
+	var requestTime []float64
+	distribution := distuv.Poisson{Lambda: lambda}
+	counter := 1
+	for {
+		requestTime = append(requestTime, distribution.Rand())
+		counter++
+		if counter > NumberOfRequests {
+			break
+		}
+	}
+	return requestTime
+}
 
 // randomPoints returns some random x, y points.
 func randomPoints(n int) plotter.XYs {
@@ -289,7 +324,7 @@ func randomPoints(n int) plotter.XYs {
 	return pts
 }
 
-func plotBox(imageName string)  {
+func plotBox(imageName string) {
 	// Get some data to display in our plot.
 	rand.Seed(int64(0))
 	n := len(functions[0].executionsTime)
@@ -297,22 +332,19 @@ func plotBox(imageName string)  {
 	for i := 0; i < len(functions); i++ {
 		results = append(results, make(plotter.Values, n))
 	}
-	
+
 	for i := 0; i < n; i++ {
 		for j := 0; j < len(functions); j++ {
 			results[j][i] = float64(functions[j].executionsTime[i])
 		}
 	}
-	
-
-	
 
 	// Create the plot and set its title and axis label.
 	p, _ := plot.New()
 
 	p.Title.Text = "Execution time (ms)"
 	p.Y.Label.Text = "time (ms)"
-    
+
 	// Make boxes for our data and add them to the plot.
 	w := vg.Points(20)
 	// var boxes []*plotter.BoxPlot
@@ -321,12 +353,11 @@ func plotBox(imageName string)  {
 	for i := 0; i < len(functions); i++ {
 		boxes[i], _ = plotter.NewBoxPlot(w, float64(i), results[i])
 		// boxes = append(boxes, b0)
-	    // if err != nil {
+		// if err != nil {
 		//    panic(err)
-	    // }
+		// }
 		p.Add(boxes[i])
 	}
-
 
 	p.NominalX("nslookup", "face-detect\npigo",
 		"qrcode-go", "face-blur", "business-strategy\ngenerator")
@@ -339,35 +370,41 @@ func plotBox(imageName string)  {
 func largest(arr []int) int {
 	var max = arr[0]
 	for i := range arr {
-	   if arr[i] > max {
-		  max = arr[i]
-	   }
+		if arr[i] > max {
+			max = arr[i]
+		}
 	}
 	return max
- }
+}
 
- func largestInt64(arr []int64) int {
+func largestInt64(arr []int64) int {
 	var max = arr[0]
 	for i := range arr {
-	   if arr[i] > max {
-		  max = arr[i]
-	   }
+		if arr[i] > max {
+			max = arr[i]
+		}
 	}
 	return int(max)
- }
- 
- func averageInt64(arr []int64) int {
-	sum := 0 
+}
+
+func averageInt64(arr []int64) int {
+	sum := 0
 	for i := range arr {
-	   sum = sum + int(arr[i])
+		sum = sum + int(arr[i])
 	}
-	return int(sum/len(arr))
- }
- 
- func clearExecutionTime()  {
+	return int(sum / len(arr))
+}
+
+func averageInt(arr []int) int {
+	sum := 0
+	for i := range arr {
+		sum = sum + int(arr[i])
+	}
+	return int(sum / len(arr))
+}
+
+func clearExecutionTime() {
 	for i := 0; i < len(functions); i++ {
 		functions[i].executionsTime = functions[i].executionsTime[:0]
 	}
- }
- 
-    
+}
