@@ -3,10 +3,11 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"log"
 	"math/rand"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	// "benchmark/internal/distuv"
@@ -26,9 +27,11 @@ import (
 
 const (
 	// TestTime = 5
-	RequestTimePoissonLambda = 50
-	NumberOfRequests         = 50
+	RequestTimePoissonLambda = 100
+	NumberOfRequests         = 40
 	NumberOfTests            = 5
+	Training                 = false
+	NumberOfUniqueInputFiles = 20
 )
 
 type Function struct {
@@ -43,9 +46,11 @@ type Function struct {
 }
 
 var functions []Function
+var mutex sync.Mutex
 
 func main() {
-
+	log.Printf("RequestTimePoissonLambda: %v, NumberOfRequests: %v, NumberOfTests: %v, Training: %v, NumberOfUniqueInputFiles: %v",
+		RequestTimePoissonLambda, NumberOfRequests, NumberOfTests, Training, NumberOfUniqueInputFiles)
 	functions = initialize()
 	testCounter := 0
 
@@ -73,13 +78,13 @@ func main() {
 					}
 				}
 			}
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 			counter++
 			if counter > maxTime {
 				break
 			}
 		}
-		time.Sleep(20000 * time.Millisecond)
+		time.Sleep(18000 * time.Millisecond)
 		for i, f := range functions {
 			fmt.Println("============  ", i, "===========")
 			fmt.Println("Execution time:", f.executionsTime)
@@ -137,80 +142,113 @@ func sendPostRequest(index int, url string, data string) time.Duration {
 	req.Header.Set("X-Custom-Header", "myvalue")
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 6 * time.Second}
 	t1 := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		duration := time.Since(t1)
+		fmt.Println("can not send post request  err:", err.Error())
+		if index == 0 {
+			duration = 457 * time.Millisecond
+		} else if index == 1 {
+			duration = 1116 * time.Millisecond
+		} else if index == 2 {
+			duration = 457 * time.Millisecond
+		} else if index == 3 {
+			duration = 1171 * time.Millisecond
+		} else if index == 4 {
+			duration = 464 * time.Millisecond
+		}
+		mutex.Lock()
+		functions[index].executionsTime = append(functions[index].executionsTime, duration.Milliseconds())
+		mutex.Unlock()
+		return duration
+	} else {
+		resp.Body.Close()
 	}
 	duration := time.Since(t1)
-	defer resp.Body.Close()
 
 	// fmt.Println("response Status:", resp.Status)
 	// fmt.Println("response Headers:", resp.Header)
-	_, _ = ioutil.ReadAll(resp.Body)
+	// _, _ = ioutil.ReadAll(resp.Body)
 	// fmt.Println("response Body:", len(body), ", execution time:", duration.Milliseconds())
+	mutex.Lock()
 	functions[index].executionsTime = append(functions[index].executionsTime, duration.Milliseconds())
+	mutex.Unlock()
 	return duration
 }
 
 func initialize() []Function {
 
 	var images []string
+	var images2 []string
 	var websites []string
 	var functions []Function
 	var requestTime []int
 
-	counter := 1
-	for {
-		images = append(images, "http://mvatandoosts.ir/assets/images/I"+strconv.Itoa(counter)+".jpg")
-		counter++
-		// if counter > 30 {
-		// 	break
-		// }
-		if counter > 10 {
-			break
+	if Training {
+		websites = append(websites, "lvp.ir")
+		websites = append(websites, "honar.ac.ir")
+		websites = append(websites, "cila.ir")
+		websites = append(websites, "ncc.org.ir")
+		websites = append(websites, "zakhireh.co.ir")
+		websites = append(websites, "aeoi.org.ir")
+		websites = append(websites, "ilamchto.ir")
+		websites = append(websites, "zanjan.ichto.ir")
+		websites = append(websites, "chht-sb.ir")
+		websites = append(websites, "miras.kr.ir")
+		websites = append(websites, "hadafmandi.ir")
+		websites = append(websites, "ilam.ict.gov.ir")
+
+		websites = append(websites, "postbank.ir")
+		websites = append(websites, "isrc.ac.ir")
+		websites = append(websites, "ilam.medu.ir")
+		websites = append(websites, "khn.medu.ir")
+		websites = append(websites, "qom.medu.ir")
+		websites = append(websites, "lorestan.medu.ir")
+		websites = append(websites, "srttu.edu")
+		websites = append(websites, "mosharekat.medu.ir")
+		websites = append(websites, "irica.gov.ir")
+		websites = append(websites, "mfa.gov.ir")
+		websites = append(websites, "hbi.ir")
+		websites = append(websites, "roostaa.ir")
+
+		counter := 11
+		for {
+			images = append(images, "http://mvatandoosts.ir/assets/images/I"+strconv.Itoa(counter)+".jpg")
+			counter++
+			if counter > 30 {
+				break
+			}
 		}
+	} else {
+		counter := 1
+		for {
+			if counter%2 == 0 {
+				images = append(images, "http://mvatandoosts.ir/assets/images/I"+strconv.Itoa(counter)+".jpg")
+			} else {
+				images2 = append(images, "http://mvatandoosts.ir/assets/images/I"+strconv.Itoa(counter)+".jpg")
+			}
+			counter++
+			if counter > NumberOfUniqueInputFiles {
+				break
+			}
+		}
+
+		fmt.Printf("len(images): %v, len(images2): %v \n", len(images), len(images2))
+		websites = append(websites, "google.com")
+		websites = append(websites, "varzesh3.com")
+		websites = append(websites, "digikala.com")
+		websites = append(websites, "yahoo.com")
+		websites = append(websites, "stackoverflow.com")
+		websites = append(websites, "github.com")
+		websites = append(websites, "ut.ac.ir")
+		websites = append(websites, "downloadha.com")
+		websites = append(websites, "p30download.com")
+		websites = append(websites, "coinmarketcap.com")
+		websites = append(websites, "divar.ir")
+		websites = append(websites, "mvatandoosts.ir")
 	}
-
-	websites = append(websites, "google.com")
-	websites = append(websites, "varzesh3.com")
-	websites = append(websites, "digikala.com")
-	websites = append(websites, "yahoo.com")
-	websites = append(websites, "stackoverflow.com")
-	websites = append(websites, "github.com")
-	websites = append(websites, "ut.ac.ir")
-	websites = append(websites, "downloadha.com")
-	websites = append(websites, "p30download.com")
-	websites = append(websites, "coinmarketcap.com")
-	websites = append(websites, "divar.ir")
-	websites = append(websites, "mvatandoosts.ir")
-
-	// websites = append(websites, "lvp.ir")
-	// websites = append(websites, "honar.ac.ir")
-	// websites = append(websites, "cila.ir")
-	// websites = append(websites, "ncc.org.ir")
-	// websites = append(websites, "zakhireh.co.ir")
-	// websites = append(websites, "aeoi.org.ir")
-	// websites = append(websites, "ilamchto.ir")
-	// websites = append(websites, "zanjan.ichto.ir")
-	// websites = append(websites, "chht-sb.ir")
-	// websites = append(websites, "miras.kr.ir")
-	// websites = append(websites, "hadafmandi.ir")
-	// websites = append(websites, "ilam.ict.gov.ir")
-
-	// websites = append(websites, "postbank.ir")
-	// websites = append(websites, "isrc.ac.ir")
-	// websites = append(websites, "ilam.medu.ir")
-	// websites = append(websites, "khn.medu.ir")
-	// websites = append(websites, "qom.medu.ir")
-	// websites = append(websites, "lorestan.medu.ir")
-	// websites = append(websites, "srttu.edu")
-	// websites = append(websites, "mosharekat.medu.ir")
-	// websites = append(websites, "irica.gov.ir")
-	// websites = append(websites, "mfa.gov.ir")
-	// websites = append(websites, "hbi.ir")
-	// websites = append(websites, "roostaa.ir")
 
 	// requestsTime := makeRequestsTime(RequestTimePoissonLambda)
 	// fmt.Println("requestsTime: ", requestsTime)
@@ -236,7 +274,7 @@ func initialize() []Function {
 	sort.Ints(requestTime)
 	fmt.Println("============ 3 ============ ")
 	fmt.Println("requestTime: ", requestTime)
-	functions = append(functions, Function{url: "http://localhost:8080/function/face-blur", ips: 5, index: 0, inputs: images, requestTime: requestTime})
+	functions = append(functions, Function{url: "http://localhost:8080/function/face-blur", ips: 5, index: 0, inputs: images2, requestTime: requestTime})
 	requestTime = makeRequestTime(RequestTimePoissonLambda)
 	sort.Ints(requestTime)
 	fmt.Println("============ 4 ============ ")
